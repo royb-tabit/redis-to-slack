@@ -11,3 +11,4 @@ node_modules/
 /.idea/redis-to-slack.iml
 /.idea/vcs.xml
 .gitignore
+/redis-to-slack.zip
