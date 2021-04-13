@@ -1,51 +1,29 @@
-var AWS = require('aws-sdk');
-var url = require('url');
-var https = require('https');
-var config = require('./config');
-var _ = require('lodash');
-var hookUrl;
-
-var baseSlackMessage = {}
+const { IncomingWebhook } = require('@slack/webhook');
+// var url = process.env.HOOK_URL;
+var url = "https://hooks.slack.com/services/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";
+var lodash = require('lodash');
+var baseSlackMessage = {baseSlackMessage: "base slack message"}
+var webhook = new IncomingWebhook(url);
 
 var postMessage = function(message, callback) {
-  var body = JSON.stringify(message);
-  var options = url.parse(hookUrl);
-  options.method = 'POST';
-  options.headers = {
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(body),
-  };
-
-  var postReq = https.request(options, function(res) {
-    var chunks = [];
-    res.setEncoding('utf8');
-    res.on('data', function(chunk) {
-      return chunks.push(chunk);
+  console.log();
+  console.log(message);
+  (async () => {
+    await webhook.send({
+      text: JSON.stringify(message),
+      // username: "webhookbot",
+      // channel: "#test",
+      // icon_emoji: ":ghost"
     });
-    res.on('end', function() {
-      var body = chunks.join('');
-      if (callback) {
-        callback({
-          body: body,
-          statusCode: res.statusCode,
-          statusMessage: res.statusMessage
-        });
-      }
-    });
-    return res;
-  });
-
-  postReq.write(body);
-  postReq.end();
+  })();
 };
 
 var handleCloudWatch = function(event, context) {
   var timestamp = (new Date(event.Records[0].Sns.Timestamp)).getTime()/1000;
-  var message = JSON.parse(event.Records[0].Sns.Message);
+  var message = event.Records[0].Sns.Message;
   var region = event.Records[0].EventSubscriptionArn.split(":")[3];
   var subject = "AWS CloudWatch Notification";
   var alarmName = message.AlarmName;
-  var metricName = message.Trigger.MetricName;
   var oldState = message.OldStateValue;
   var newState = message.NewStateValue;
   var alarmDescription = message.AlarmDescription;
@@ -70,7 +48,7 @@ var handleCloudWatch = function(event, context) {
           {
             "title": "Trigger",
             "value": trigger.Statistic + " "
-              + metricName + " "
+              + trigger.MetricName + " "
               + trigger.ComparisonOperator + " "
               + trigger.Threshold + " for "
               + trigger.EvaluationPeriods + " period(s) of "
@@ -89,41 +67,65 @@ var handleCloudWatch = function(event, context) {
       }
     ]
   };
-  return _.merge(slackMessage, baseSlackMessage);
+  return lodash.merge(slackMessage, baseSlackMessage);
 };
 
 var processEvent = function(event, context) {
   console.log("sns received:" + JSON.stringify(event, null, 2));
-  var slackMessage = null;
-  var eventSnsMessageRaw = event.Records[0].Sns.Message;
-  var eventSnsMessage = null;
+  console.log("processing cloudwatch notification");
+  var slackMessage = handleCloudWatch(event,context);
 
-  try {
-    eventSnsMessage = JSON.parse(eventSnsMessageRaw);
-  }
-  catch (e) {
-  }
 
-  if(eventSnsMessage && 'AlarmName' in eventSnsMessage && 'AlarmDescription' in eventSnsMessage){
-    console.log("processing cloudwatch notification");
-    slackMessage = handleCloudWatch(event,context);
-  }
-
-  postMessage(slackMessage, function(response) {
-    if (response.statusCode < 400) {
-      console.info('message posted successfully');
-      context.succeed();
-    } else if (response.statusCode < 500) {
-      console.error("error posting message to slack API: " + response.statusCode + " - " + response.statusMessage);
-      // Don't retry because the error is due to a problem with the request
-      context.succeed();
-    } else {
-      // Let Lambda retry
-      context.fail("server error when processing message: " + response.statusCode + " - " + response.statusMessage);
-    }
-  });
+  postMessage(slackMessage);
 };
 
 exports.handler = function(event, context) {
     processEvent(event, context);
 };
+
+var myEvent = {
+  "Records": [
+    {
+      "EventSource": "aws:sns",
+      "EventVersion": "1.0",
+      "EventSubscriptionArn": "arn:aws:sns:eu-west-1:{{{accountId}}}:ExampleTopic",
+      "Sns": {
+        "Type": "Notification",
+        "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+        "TopicArn": "arn:aws:sns:eu-west-1:123456789012:ExampleTopic",
+        "Subject": "Subject",
+        "Message": {
+          "Trigger": {
+            "MetricName": "MetricName",
+            "ComparisonOperator": "ComparisonOperator",
+            "Threshold" : "Threshold",
+            "EvaluationPeriods" : "EvaluationPeriods",
+            "Period" : "Period",
+            "Statistic" : "Statistic",
+          },
+          "AlarmName": "AlarmName",
+          "OldStateValue": "OldStateValue",
+          "NewStateValue": "NewStateValue",
+          "AlarmDescription": "AlarmDescription",
+          "NewStateReason": "NewStateReason",
+        },
+        "Timestamp": "1970-01-01T00:00:00.000Z",
+        "SignatureVersion": "1",
+        "Signature": "EXAMPLE",
+        "SigningCertUrl": "EXAMPLE",
+        "UnsubscribeUrl": "EXAMPLE",
+        "MessageAttributes": {
+          "Test": {
+            "Type": "String",
+            "Value": "TestString"
+          },
+          "TestBinary": {
+            "Type": "Binary",
+            "Value": "TestBinary"
+          }
+        }
+      }
+    }
+  ]
+}
+processEvent(myEvent, 1)
