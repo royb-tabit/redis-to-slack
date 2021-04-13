@@ -1,8 +1,8 @@
 const { IncomingWebhook } = require('@slack/webhook');
 // var url = process.env.HOOK_URL;
-var url = "https://hooks.slack.com/services/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";
+var url = "https://hooks.slack.com/services/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";
 var lodash = require('lodash');
-var baseSlackMessage = {baseSlackMessage: "base slack message"}
+var baseSlackMessage = {}
 var webhook = new IncomingWebhook(url);
 
 var postMessage = function(message, callback) {
@@ -10,10 +10,11 @@ var postMessage = function(message, callback) {
   console.log(message);
   (async () => {
     await webhook.send({
-      text: JSON.stringify(message),
-      // username: "webhookbot",
+      text: message.text,
       // channel: "#test",
-      // icon_emoji: ":ghost"
+      // username: "webhookbot",
+      // icon_emoji: ":ghost",
+      attachments: message.attachments
     });
   })();
 };
