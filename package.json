@@ -2,7 +2,6 @@
   "name": "redis-to-slack",
   "version": "1.0.0",
   "dependencies": {
-    "@slack/webhook": "^6.0.0",
-    "lodash": "^4.17.21"
+    "@slack/webhook": "^6.0.0"
   }
 }
